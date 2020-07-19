@@ -29,5 +29,5 @@ func main () {
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
 	flag.Parse()
 	http.HandleFunc("/", serveFile)
-	http.ListenAndServe("192.168.1.182:"+*port, nil)
+	http.ListenAndServe(":"+*port, nil)
 }
