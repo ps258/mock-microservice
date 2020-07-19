@@ -13,7 +13,7 @@ var port *string
 var contentType *string
 
 func serveFile (w http.ResponseWriter, req *http.Request) {
-	fmt.Println("[INFO]Opening " + *fileName)
+	fmt.Println("[INFO]Serving " + *fileName)
 	fileContents, err := ioutil.ReadFile(*fileName)
 	if err != nil {
 		fmt.Println("[FATAL]Unable to load file "+*fileName+": ", err)
