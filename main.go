@@ -29,5 +29,8 @@ func main () {
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
 	flag.Parse()
 	http.HandleFunc("/", serveFile)
-	http.ListenAndServe(":"+*port, nil)
+	err := http.ListenAndServe(":"+*port, nil)
+	if err != nil {
+		fmt.Println("[FATAL]Unable to serve on port "+*port, err)
+	}
 }
