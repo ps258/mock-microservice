@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"flag"
 	"fmt"
+  "log"
 	"io/ioutil"
 	"os"
 )
@@ -12,9 +13,13 @@ var fileName *string
 var port *string
 var contentType *string
 var fileContents []byte
+var verbose *bool
 
 func serveFile (w http.ResponseWriter, req *http.Request) {
 	//fmt.Println("[INFO]Serving " + *fileName)
+  if *verbose {
+    log.Println("[INFO]Serving " + *fileName)
+  }
 	w.Header().Set("Content-Type", *contentType)
 	fmt.Fprintf(w, string(fileContents))
 }
@@ -24,6 +29,7 @@ func main () {
 	port = flag.String("port", "8080", "The port to listen on")
 	fileName = flag.String("file", "", "File to serve")
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
+  verbose = flag.Bool("verbose", false, "Verbose output")
 	flag.Parse()
 	fileContents, err = ioutil.ReadFile(*fileName)
 	if err != nil {
