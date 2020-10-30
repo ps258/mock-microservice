@@ -16,7 +16,6 @@ var fileContents []byte
 var verbose *bool
 
 func serveFile (w http.ResponseWriter, req *http.Request) {
-	//fmt.Println("[INFO]Serving " + *fileName)
   if *verbose {
     log.Println("[INFO]Serving " + *fileName)
   }
@@ -27,7 +26,7 @@ func serveFile (w http.ResponseWriter, req *http.Request) {
 func main () {
   var err error
 	port = flag.String("port", "8080", "The port to listen on")
-	fileName = flag.String("file", "", "File to serve")
+	fileName = flag.String("file", "file.json", "File to serve")
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
   verbose = flag.Bool("verbose", false, "Verbose output")
 	flag.Parse()
