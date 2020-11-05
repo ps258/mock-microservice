@@ -45,6 +45,8 @@ func main () {
   flag.BoolVar(&returnTime,"time", false, "Return the timestamp rather than the contents of a file")
 
 	flag.Parse()
+  http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
+  http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
   if returnTime {
     http.HandleFunc("/", serveTime)
   } else {
