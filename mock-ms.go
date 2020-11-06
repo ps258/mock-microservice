@@ -32,7 +32,8 @@ func serveTime (w http.ResponseWriter, req *http.Request) {
     log.Println("[INFO]Serving Time")
   }
 	w.Header().Set("Content-Type", *contentType)
-  fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
+  //fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
+  fmt.Fprintf(w, time.Now().Format(time.StampMicro) + "\n")
 }
 
 func main () {
