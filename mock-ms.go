@@ -58,7 +58,7 @@ func main() {
 		}
 		http.HandleFunc("/", serveFile)
 	}
-	fmt.Println("Listening on 0.0.0.0:" + *port)
+  fmt.Println("Listening on port", *port)
 	err = http.ListenAndServe(":"+*port, nil)
 	if err != nil {
 		fmt.Println("[FATAL]Unable to serve on port "+*port, err)
