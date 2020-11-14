@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-  "net"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -29,7 +29,7 @@ func printListenInfo(port *string) {
 		//if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 		if ipnet, ok := a.(*net.IPNet); ok {
 			if ipnet.IP.To4() != nil {
-        fmt.Println("Listening on http://" + ipnet.IP.String() + ":" + *port)
+				fmt.Println("Listening on http://" + ipnet.IP.String() + ":" + *port)
 			}
 		}
 	}
@@ -74,7 +74,7 @@ func main() {
 		}
 		http.HandleFunc("/", serveFile)
 	}
-  printListenInfo(port)
+	printListenInfo(port)
 	err = http.ListenAndServe(":"+*port, nil)
 	if err != nil {
 		fmt.Println("[FATAL]Unable to serve on port "+*port, err)
