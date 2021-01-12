@@ -14,6 +14,7 @@ import (
 var (
 	fileName     *string
 	port         *string
+  delay        int
 	contentType  *string
 	fileContents []byte
 	verbose      bool
@@ -35,7 +36,21 @@ func printListenInfo(port *string) {
 	}
 }
 
+func delayReply() {
+  // just wait for a while
+  if delay > 0 {
+    if verbose {
+      log.Println("[INFO]Waiting", delay, "(s)")
+    }
+    time.Sleep(time.Duration(delay) * time.Second)
+    if verbose {
+      log.Println("[INFO]Waiting over")
+    }
+  }
+}
+
 func serveFile(w http.ResponseWriter, req *http.Request) {
+  delayReply()
 	if verbose {
 		log.Println("[INFO]Serving " + *fileName)
 	}
@@ -44,6 +59,7 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 }
 
 func serveTime(w http.ResponseWriter, req *http.Request) {
+  delayReply()
 	if verbose {
 		log.Println("[INFO]Serving Time")
 	}
@@ -60,6 +76,7 @@ func main() {
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
+	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
 
 	flag.Parse()
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
