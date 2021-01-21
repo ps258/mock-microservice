@@ -14,43 +14,51 @@ import (
 var (
 	fileName     *string
 	port         *string
-  delay        int
+	delay        int
 	contentType  *string
 	fileContents []byte
 	verbose      bool
 	returnTime   bool
+	cert         *string
+	key          *string
 )
 
 func printListenInfo(port *string) {
+  var protocol string 
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Fatal("Oops: " + err.Error())
 	}
+  if *cert == "" {
+    protocol = "http"
+  } else {
+    protocol = "https"
+  }
 	for _, a := range addrs {
 		//if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 		if ipnet, ok := a.(*net.IPNet); ok {
 			if ipnet.IP.To4() != nil {
-				fmt.Println("Listening on http://" + ipnet.IP.String() + ":" + *port)
+				fmt.Println("Listening on " + protocol + "://" + ipnet.IP.String() + ":" + *port)
 			}
 		}
 	}
 }
 
 func delayReply() {
-  // just wait for a while
-  if delay > 0 {
-    if verbose {
-      log.Println("[INFO]Waiting", delay, "(s)")
-    }
-    time.Sleep(time.Duration(delay) * time.Second)
-    if verbose {
-      log.Println("[INFO]Waiting over")
-    }
-  }
+	// just wait for a while
+	if delay > 0 {
+		if verbose {
+			log.Println("[INFO]Waiting", delay, "(s)")
+		}
+		time.Sleep(time.Duration(delay) * time.Second)
+		if verbose {
+			log.Println("[INFO]Waiting over")
+		}
+	}
 }
 
 func serveFile(w http.ResponseWriter, req *http.Request) {
-  delayReply()
+	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving " + *fileName)
 	}
@@ -59,7 +67,7 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 }
 
 func serveTime(w http.ResponseWriter, req *http.Request) {
-  delayReply()
+	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving Time")
 	}
@@ -77,8 +85,16 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
+	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
+	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
 
 	flag.Parse()
+
+	if (*cert != "" && *key == "") || (*cert == "" && *key != "") {
+		fmt.Println("[FATAL]Either cert and key shuold both be given or neither")
+		os.Exit(1)
+	}
+
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
 	if returnTime {
@@ -92,7 +108,11 @@ func main() {
 		http.HandleFunc("/", serveFile)
 	}
 	printListenInfo(port)
-	err = http.ListenAndServe(":"+*port, nil)
+	if *cert != "" {
+		err = http.ListenAndServeTLS(":"+*port, *cert, *key, nil)
+	} else {
+		err = http.ListenAndServe(":"+*port, nil)
+	}
 	if err != nil {
 		fmt.Println("[FATAL]Unable to serve on port "+*port, err)
 	}
