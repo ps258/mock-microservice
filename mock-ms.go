@@ -21,10 +21,11 @@ var (
 	returnTime   bool
 	cert         *string
 	key          *string
+  statusError  int
 )
 
 func printListenInfo(port *string) {
-  var protocol string 
+  var protocol string
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Fatal("Oops: " + err.Error())
@@ -76,6 +77,16 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, time.Now().Format(time.StampMicro)+"\n")
 }
 
+func serveError(w http.ResponseWriter, req *http.Request) {
+  var httpMessage string
+  httpMessage = fmt.Sprintf("Returning http code: %d", statusError)
+	delayReply()
+	if verbose {
+		log.Println("[INFO]Serving Error ", statusError)
+	}
+  http.Error(w, httpMessage, statusError)
+}
+
 func main() {
 	var err error
 
@@ -87,6 +98,7 @@ func main() {
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
+  flag.IntVar(&statusError, "HttpCode", 0, "http code to return. Nothing else returnes")
 
 	flag.Parse()
 
@@ -99,6 +111,8 @@ func main() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
 	if returnTime {
 		http.HandleFunc("/", serveTime)
+  } else if statusError != 0 {
+		http.HandleFunc("/", serveError)
 	} else {
 		fileContents, err = ioutil.ReadFile(*fileName)
 		if err != nil {
