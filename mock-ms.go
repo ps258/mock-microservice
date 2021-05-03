@@ -61,7 +61,7 @@ func delayReply() {
 func serveFile(w http.ResponseWriter, req *http.Request) {
 	delayReply()
 	if verbose {
-		log.Println("[INFO]Serving " + *fileName)
+		log.Println("[INFO]Serving " + *fileName + " to " + req.RemoteAddr)
 	}
 	w.Header().Set("Content-Type", *contentType)
 	fmt.Fprintf(w, string(fileContents))
@@ -70,7 +70,7 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 func serveTime(w http.ResponseWriter, req *http.Request) {
 	delayReply()
 	if verbose {
-		log.Println("[INFO]Serving Time")
+		log.Println("[INFO]Serving Time to " + req.RemoteAddr)
 	}
 	w.Header().Set("Content-Type", *contentType)
 	//fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
@@ -79,7 +79,7 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 
 func serveError(w http.ResponseWriter, req *http.Request) {
 	var httpMessage string
-	httpMessage = fmt.Sprintf("Returning http code: %d", statusError)
+	httpMessage = fmt.Sprintf("Returning http code: %d", statusError , "to " + req.RemoteAddr)
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving http code:", statusError)
@@ -103,7 +103,7 @@ func main() {
 	flag.Parse()
 
 	if (*cert != "" && *key == "") || (*cert == "" && *key != "") {
-		fmt.Println("[FATAL]Either cert and key shuold both be given or neither")
+		fmt.Println("[FATAL]Either cert and key should both be given or neither")
 		os.Exit(1)
 	}
 
@@ -128,6 +128,6 @@ func main() {
 		err = http.ListenAndServe(":"+*port, nil)
 	}
 	if err != nil {
-		fmt.Println("[FATAL]Unable to serve on port "+*port, err)
+		fmt.Println("[FATAL]Unable to serve on port " + *port, err)
 	}
 }
