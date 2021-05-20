@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+  "crypto/sha256"
 )
 
 var (
@@ -19,6 +20,7 @@ var (
 	fileContents []byte
 	verbose      bool
 	returnTime   bool
+	returnSHA    bool
 	cert         *string
 	key          *string
 	statusError  int
@@ -67,6 +69,16 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, string(fileContents))
 }
 
+func serveSHA(w http.ResponseWriter, req *http.Request) {
+  h := sha256.New()
+	delayReply()
+	if verbose {
+		log.Println("[INFO]Serving SHA256 to " + req.RemoteAddr)
+	}
+	w.Header().Set("Content-Type", *contentType)
+  h.Write([]byte(time.Now().Format(time.RFC850)))
+	fmt.Fprintf(w, "%x", h.Sum(nil))
+}
 func serveTime(w http.ResponseWriter, req *http.Request) {
 	delayReply()
 	if verbose {
@@ -95,6 +107,7 @@ func main() {
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
+	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
@@ -111,6 +124,8 @@ func main() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
 	if returnTime {
 		http.HandleFunc("/", serveTime)
+  } else if returnSHA {
+    http.HandleFunc("/", serveSHA)
 	} else if statusError != 0 {
 		http.HandleFunc("/", serveError)
 	} else {
