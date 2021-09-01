@@ -7,8 +7,10 @@ import (
 	"log"
 	"net"
 	"net/http"
+  "net/http/httputil"
 	"os"
 	"time"
+  "strconv"
   "crypto/sha256"
 )
 
@@ -19,6 +21,7 @@ var (
 	contentType  *string
 	fileContents []byte
 	verbose      bool
+	dumpReq      bool
 	returnTime   bool
 	returnSHA    bool
 	cert         *string
@@ -71,22 +74,29 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 
 func serveSHA(w http.ResponseWriter, req *http.Request) {
   h := sha256.New()
+  now := time.Now()
 	delayReply()
 	if verbose {
-		log.Println("[INFO]Serving SHA256 to " + req.RemoteAddr)
+		log.Println("[INFO]Serving SHA256 of " + strconv.FormatInt(now.UnixNano(), 10) + " to " + req.RemoteAddr)
 	}
 	w.Header().Set("Content-Type", *contentType)
-  h.Write([]byte(time.Now().Format(time.RFC850)))
+  h.Write([]byte(strconv.FormatInt(now.UnixNano(), 10)))
 	fmt.Fprintf(w, "%x", h.Sum(nil))
 }
+
 func serveTime(w http.ResponseWriter, req *http.Request) {
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving Time to " + req.RemoteAddr)
-	}
-	w.Header().Set("Content-Type", *contentType)
-	//fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
-	fmt.Fprintf(w, time.Now().Format(time.StampMicro)+"\n")
+    requestDump, err := httputil.DumpRequest(req, true)
+    if err != nil {
+      fmt.Println(err)
+    }
+    fmt.Println(string(requestDump))
+  }
+  w.Header().Set("Content-Type", *contentType)
+  //fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
+  fmt.Fprintf(w, time.Now().Format(time.StampMicro)+"\n")
 }
 
 func serveError(w http.ResponseWriter, req *http.Request) {
@@ -106,6 +116,7 @@ func main() {
 	fileName = flag.String("file", "file.json", "File to serve")
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&dumpReq, "dumpReq", false, "Dump the request")
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
