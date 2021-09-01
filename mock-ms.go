@@ -63,7 +63,18 @@ func delayReply() {
 	}
 }
 
+func dumpRequest(req *http.Request) {
+  if dumpReq {
+    requestDump, err := httputil.DumpRequest(req, true)
+      if err != nil {
+        fmt.Println(err)
+      }
+    fmt.Println(string(requestDump))
+  }
+}
+
 func serveFile(w http.ResponseWriter, req *http.Request) {
+  dumpRequest(req)
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving " + *fileName + " to " + req.RemoteAddr)
@@ -73,6 +84,7 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 }
 
 func serveSHA(w http.ResponseWriter, req *http.Request) {
+  dumpRequest(req)
   h := sha256.New()
   now := time.Now()
 	delayReply()
@@ -85,14 +97,10 @@ func serveSHA(w http.ResponseWriter, req *http.Request) {
 }
 
 func serveTime(w http.ResponseWriter, req *http.Request) {
+  dumpRequest(req)
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving Time to " + req.RemoteAddr)
-    requestDump, err := httputil.DumpRequest(req, true)
-    if err != nil {
-      fmt.Println(err)
-    }
-    fmt.Println(string(requestDump))
   }
   w.Header().Set("Content-Type", *contentType)
   //fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
@@ -101,11 +109,12 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 
 func serveError(w http.ResponseWriter, req *http.Request) {
 	var httpMessage string
-	httpMessage = fmt.Sprintf("Returning http code: %d", statusError , "to " + req.RemoteAddr)
+  dumpRequest(req)
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving http code:", statusError)
 	}
+	httpMessage = fmt.Sprintf("Returning http code: %d", statusError , "to " + req.RemoteAddr)
 	http.Error(w, httpMessage, statusError)
 }
 
@@ -122,7 +131,7 @@ func main() {
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
-	flag.IntVar(&statusError, "HttpCode", 0, "http code to return. Nothing else returnes")
+	flag.IntVar(&statusError, "HttpCode", 0, "http code to return. Nothing else returned")
 
 	flag.Parse()
 
