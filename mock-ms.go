@@ -1,17 +1,17 @@
 package main
 
 import (
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
-  "net/http/httputil"
+	"net/http/httputil"
 	"os"
+	"strconv"
 	"time"
-  "strconv"
-  "crypto/sha256"
 )
 
 var (
@@ -64,17 +64,17 @@ func delayReply() {
 }
 
 func dumpRequest(req *http.Request) {
-  if dumpReq {
-    requestDump, err := httputil.DumpRequest(req, true)
-      if err != nil {
-        fmt.Println(err)
-      }
-    fmt.Println(string(requestDump))
-  }
+	if dumpReq {
+		requestDump, err := httputil.DumpRequest(req, true)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(string(requestDump))
+	}
 }
 
 func serveFile(w http.ResponseWriter, req *http.Request) {
-  dumpRequest(req)
+	dumpRequest(req)
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving " + *fileName + " to " + req.RemoteAddr)
@@ -84,37 +84,37 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 }
 
 func serveSHA(w http.ResponseWriter, req *http.Request) {
-  dumpRequest(req)
-  h := sha256.New()
-  now := time.Now()
+	dumpRequest(req)
+	h := sha256.New()
+	now := time.Now()
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving SHA256 of " + strconv.FormatInt(now.UnixNano(), 10) + " to " + req.RemoteAddr)
 	}
 	w.Header().Set("Content-Type", *contentType)
-  h.Write([]byte(strconv.FormatInt(now.UnixNano(), 10)))
+	h.Write([]byte(strconv.FormatInt(now.UnixNano(), 10)))
 	fmt.Fprintf(w, "%x", h.Sum(nil))
 }
 
 func serveTime(w http.ResponseWriter, req *http.Request) {
-  dumpRequest(req)
+	dumpRequest(req)
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving Time to " + req.RemoteAddr)
-  }
-  w.Header().Set("Content-Type", *contentType)
-  //fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
-  fmt.Fprintf(w, time.Now().Format(time.StampMicro)+"\n")
+	}
+	w.Header().Set("Content-Type", *contentType)
+	//fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
+	fmt.Fprintf(w, time.Now().Format(time.StampMicro)+"\n")
 }
 
 func serveError(w http.ResponseWriter, req *http.Request) {
 	var httpMessage string
-  dumpRequest(req)
+	dumpRequest(req)
 	delayReply()
 	if verbose {
 		log.Println("[INFO]Serving http code:", statusError)
 	}
-	httpMessage = fmt.Sprintf("Returning http code: %d", statusError , "to " + req.RemoteAddr)
+	httpMessage = fmt.Sprintf("Returning http code: %d", statusError, "to "+req.RemoteAddr)
 	http.Error(w, httpMessage, statusError)
 }
 
@@ -144,8 +144,8 @@ func main() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
 	if returnTime {
 		http.HandleFunc("/", serveTime)
-  } else if returnSHA {
-    http.HandleFunc("/", serveSHA)
+	} else if returnSHA {
+		http.HandleFunc("/", serveSHA)
 	} else if statusError != 0 {
 		http.HandleFunc("/", serveError)
 	} else {
@@ -163,6 +163,6 @@ func main() {
 		err = http.ListenAndServe(":"+*port, nil)
 	}
 	if err != nil {
-		fmt.Println("[FATAL]Unable to serve on port " + *port, err)
+		fmt.Println("[FATAL]Unable to serve on port "+*port, err)
 	}
 }
