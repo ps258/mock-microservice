@@ -112,9 +112,9 @@ func serveError(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	delayReply()
 	if verbose {
-		log.Println("[INFO]Serving http code:", statusError)
+		log.Println("[INFO]Serving http code:", statusError, "to", req.RemoteAddr)
 	}
-	httpMessage = fmt.Sprintf("Returning http code: %d", statusError, "to "+req.RemoteAddr)
+	httpMessage = fmt.Sprintf("Mock-ms http code: %d", statusError)
 	http.Error(w, httpMessage, statusError)
 }
 
