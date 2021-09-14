@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -80,7 +81,8 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 		log.Println("[INFO]Serving " + *fileName + " to " + req.RemoteAddr)
 	}
 	w.Header().Set("Content-Type", *contentType)
-	fmt.Fprintf(w, string(fileContents))
+	//fmt.Fprintf(w, fileContents)
+	binary.Write(w, binary.LittleEndian, fileContents)
 }
 
 func serveSHA(w http.ResponseWriter, req *http.Request) {
