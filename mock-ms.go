@@ -20,6 +20,7 @@ var (
 	port         *string
 	delay        int
 	contentType  *string
+	header		 *string
 	fileContents []byte
 	verbose      bool
 	dumpReq      bool
@@ -144,6 +145,7 @@ func main() {
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
+	header = flag.String("header", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
 	flag.IntVar(&statusError, "HttpCode", 0, "http code to return. Nothing else returned")
