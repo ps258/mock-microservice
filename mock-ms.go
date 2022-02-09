@@ -20,7 +20,7 @@ var (
 	port         *string
 	delay        int
 	contentType  *string
-	header		 *string
+	header       *string
 	fileContents []byte
 	verbose      bool
 	dumpReq      bool
@@ -29,7 +29,7 @@ var (
 	returnSHA    bool
 	cert         *string
 	key          *string
-	statusError  int
+	statusToReturn  int
 )
 
 func printListenInfo(port *string) {
@@ -122,15 +122,13 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, now.Format(time.StampMicro)+"\n")
 }
 
-func serveError(w http.ResponseWriter, req *http.Request) {
-	var httpMessage string
+func serveReturnCode(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	delayReply()
 	if verbose {
-		log.Println("[INFO]Serving http code:", statusError, "to", req.RemoteAddr)
+		log.Println("[INFO]Serving http code:", statusToReturn, "to", req.RemoteAddr)
 	}
-	httpMessage = fmt.Sprintf("Mock-ms http code: %d", statusError)
-	http.Error(w, httpMessage, statusError)
+	http.Error(w, "", statusToReturn)
 }
 
 func main() {
@@ -148,7 +146,7 @@ func main() {
 	header = flag.String("header", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
-	flag.IntVar(&statusError, "HttpCode", 0, "http code to return. Nothing else returned")
+	flag.IntVar(&statusToReturn, "HttpCode", 0, "http code to return. Nothing else returned")
 
 	flag.Parse()
 
@@ -163,8 +161,8 @@ func main() {
 		http.HandleFunc("/", serveTime)
 	} else if returnSHA {
 		http.HandleFunc("/", serveSHA)
-	} else if statusError != 0 {
-		http.HandleFunc("/", serveError)
+	} else if statusToReturn != 0 {
+		http.HandleFunc("/", serveReturnCode)
 	} else {
 		fileContents, err = ioutil.ReadFile(*fileName)
 		if err != nil {
