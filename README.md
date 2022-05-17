@@ -1,3 +1,3 @@
 # mock-microservice
 
-This is a simple golang daemon which serves the text file given on the named port
+This is a simple golang daemon which is a bit like httpbin.org but has the options I need
