@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -16,21 +16,23 @@ import (
 )
 
 var (
-	fileName     *string
-	port         *string
-	delay        int
-	contentType  *string
-	header       *string
-	fileContents []byte
-	verbose      bool
-	dumpReq      bool
-	contentLength bool
-	returnTime   bool
-	returnSHA    bool
-	cert         *string
-	key          *string
-	statusToReturn  int
+	fileName       *string
+	port           *string
+	delay          int
+	contentType    *string
+	header         *string
+	fileContents   []byte
+	verbose        bool
+	dumpReq        bool
+	contentLength  bool
+	returnTime     bool
+	returnSHA      bool
+	cert           *string
+	key            *string
+	statusToReturn int
 )
+
+const fileBuffer = 10485760
 
 func printListenInfo(port *string) {
 	var protocol string
@@ -84,11 +86,51 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Set("Content-Type", *contentType)
 	if contentLength {
+		// stat the file and get the length
+		fi, err := os.Stat(*fileName)
+		if err != nil {
+			// Could not obtain stat, handle error
+			fmt.Println("[FATAL]Unable to stat file "+*fileName+": ", err)
+			os.Exit(1)
+		}
+		w.Header().Set("Content-Length", strconv.FormatInt(fi.Size(), 10))
+	}
+	file, err := os.Open(*fileName)
+	if err != nil {
+		fmt.Println("[FATAL]Unable to load file "+*fileName+": ", err)
+		os.Exit(1)
+	}
+	defer file.Close()
+	buffer := make([]byte, fileBuffer)
+	for {
+		bytesread, err := file.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println("[FATAL]Error reading file "+*fileName+": ", err)
+				os.Exit(1)
+			}
+			break
+		}
+		binary.Write(w, binary.LittleEndian, buffer[:bytesread])
+		//fmt.Println("bytes read: ", bytesread)
+		//fmt.Println("bytestream to string: ", string(buffer[:bytesread]))
+	}
+}
+
+/*
+func serveFile(w http.ResponseWriter, req *http.Request) {
+	dumpRequest(req)
+	delayReply()
+	if verbose {
+		log.Println("[INFO]Serving " + *fileName + " to " + req.RemoteAddr)
+	}
+	w.Header().Set("Content-Type", *contentType)
+	if contentLength {
 		w.Header().Set("Content-Length", strconv.Itoa(len(fileContents)))
 	}
 	//fmt.Fprintf(w, fileContents)
 	binary.Write(w, binary.LittleEndian, fileContents)
-}
+} */
 
 func serveSHA(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
@@ -164,11 +206,11 @@ func main() {
 	} else if statusToReturn != 0 {
 		http.HandleFunc("/", serveReturnCode)
 	} else {
-		fileContents, err = ioutil.ReadFile(*fileName)
+		/* fileContents, err = ioutil.ReadFile(*fileName)
 		if err != nil {
 			fmt.Println("[FATAL]Unable to load file "+*fileName+": ", err)
 			os.Exit(1)
-		}
+		} */
 		http.HandleFunc("/", serveFile)
 	}
 	printListenInfo(port)
