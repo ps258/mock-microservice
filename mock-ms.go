@@ -140,13 +140,13 @@ func getUpload(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	delayReply()
+	addHeaders(w)
 	log.Println("form name; " + req.FormValue("Name"))
 	file, fileHeader, err := req.FormFile("Name")
 	if verbose {
 		//log.Println("[INFO]Uploading " + fileHeader.Filename + " from " + req.RemoteAddr)
 		log.Println("[INFO]Uploading " + "fred" + " from " + req.RemoteAddr)
 	}
-	w.Header().Set("Content-Type", *contentType)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -165,6 +165,7 @@ func getUpload(w http.ResponseWriter, req *http.Request) {
 	}
 	fmt.Fprintf(w, "Upload successful")
 }
+
 func serveSHA(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	h := sha256.New()
@@ -210,7 +211,6 @@ func serveReturnCode(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	var err error
-
 	port = flag.String("port", "8080", "The port to listen on")
 	fileName = flag.String("file", "", "File to serve")
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
