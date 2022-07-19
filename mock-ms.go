@@ -60,11 +60,13 @@ func printListenInfo(port *string) {
 }
 
 func addHeaders(w http.ResponseWriter) {
-	for _, header := range strings.Split(*headers, ",") {
-		header_parts := strings.Split(header, ":")
-		header_parts[0] = strings.TrimSpace(header_parts[0])
-		header_parts[1] = strings.TrimSpace(header_parts[1])
-		w.Header().Set(header_parts[0], header_parts[1])
+	if len(*headers) > 0 {
+		for _, header := range strings.Split(*headers, ",") {
+			header_parts := strings.Split(header, ":")
+			header_parts[0] = strings.TrimSpace(header_parts[0])
+			header_parts[1] = strings.TrimSpace(header_parts[1])
+			w.Header().Set(header_parts[0], header_parts[1])
+		}
 	}
 	w.Header().Set("Content-Type", *contentType)
 }
