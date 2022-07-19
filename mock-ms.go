@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -23,12 +24,12 @@ var (
 	delay          int
 	contentType    *string
 	headers        *string
-	fileContents   []byte
 	verbose        bool
 	dumpReq        bool
 	contentLength  bool
 	returnTime     bool
 	returnSHA      bool
+	uploadFile     bool
 	cert           *string
 	key            *string
 	statusToReturn int
@@ -132,6 +133,38 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func getUpload(w http.ResponseWriter, req *http.Request) {
+	dumpRequest(req)
+	if req.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	delayReply()
+	log.Println("form name; " + req.FormValue("Name"))
+	file, fileHeader, err := req.FormFile("Name")
+	if verbose {
+		//log.Println("[INFO]Uploading " + fileHeader.Filename + " from " + req.RemoteAddr)
+		log.Println("[INFO]Uploading " + "fred" + " from " + req.RemoteAddr)
+	}
+	w.Header().Set("Content-Type", *contentType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	dst, err := os.Create(filepath.Ext(fileHeader.Filename))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fmt.Fprintf(w, "Upload successful")
+}
 func serveSHA(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	h := sha256.New()
@@ -179,13 +212,14 @@ func main() {
 	var err error
 
 	port = flag.String("port", "8080", "The port to listen on")
-	fileName = flag.String("file", "file.json", "File to serve")
+	fileName = flag.String("file", "", "File to serve")
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&dumpReq, "dumpReq", false, "Dump the request")
 	flag.BoolVar(&contentLength, "contentLength", false, "Populate the Content-Length header in the reply")
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
+	flag.BoolVar(&uploadFile, "uploadFile", false, "Accept a file via POST and save it locally. Expects 'Name' in the form")
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
 	headers = flag.String("headers", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
@@ -207,13 +241,14 @@ func main() {
 		http.HandleFunc("/", serveSHA)
 	} else if statusToReturn != 0 {
 		http.HandleFunc("/", serveReturnCode)
-	} else {
-		/* fileContents, err = ioutil.ReadFile(*fileName)
-		if err != nil {
-			fmt.Println("[FATAL]Unable to load file "+*fileName+": ", err)
-			os.Exit(1)
-		} */
+	} else if uploadFile {
+		http.HandleFunc("/", getUpload)
+	} else if *fileName != "" {
 		http.HandleFunc("/", serveFile)
+	} else {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+			os.Exit(1)
 	}
 	printListenInfo(port)
 	if *cert != "" {
