@@ -9,18 +9,20 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"strconv"
+	"strings"
 	"time"
+	"net/http/httputil"
 )
+	//"github.com/davecgh/go-spew/spew"
 
 var (
 	fileName       *string
 	port           *string
 	delay          int
 	contentType    *string
-	header         *string
+	headers        *string
 	fileContents   []byte
 	verbose        bool
 	dumpReq        bool
@@ -32,6 +34,7 @@ var (
 	statusToReturn int
 )
 
+// 10MiB buffer
 const fileBuffer = 10485760
 
 func printListenInfo(port *string) {
@@ -55,6 +58,16 @@ func printListenInfo(port *string) {
 	}
 }
 
+func addHeaders(w http.ResponseWriter) {
+	for _, header := range strings.Split(*headers, ",") {
+		header_parts := strings.Split(header, ":")
+		header_parts[0] = strings.TrimSpace(header_parts[0])
+		header_parts[1] = strings.TrimSpace(header_parts[1])
+		w.Header().Set(header_parts[0], header_parts[1])
+	}
+	w.Header().Set("Content-Type", *contentType)
+}
+
 func delayReply() {
 	// just wait for a while
 	if delay > 0 {
@@ -75,16 +88,18 @@ func dumpRequest(req *http.Request) {
 			fmt.Println(err)
 		}
 		fmt.Println(string(requestDump))
+		//fmt.Println(spew.Sdump(req))
 	}
 }
 
+// serve file using a buffer to handle large files
 func serveFile(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	delayReply()
+	addHeaders(w)
 	if verbose {
 		log.Println("[INFO]Serving " + *fileName + " to " + req.RemoteAddr)
 	}
-	w.Header().Set("Content-Type", *contentType)
 	if contentLength {
 		// stat the file and get the length
 		fi, err := os.Stat(*fileName)
@@ -117,30 +132,15 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-/*
-func serveFile(w http.ResponseWriter, req *http.Request) {
-	dumpRequest(req)
-	delayReply()
-	if verbose {
-		log.Println("[INFO]Serving " + *fileName + " to " + req.RemoteAddr)
-	}
-	w.Header().Set("Content-Type", *contentType)
-	if contentLength {
-		w.Header().Set("Content-Length", strconv.Itoa(len(fileContents)))
-	}
-	//fmt.Fprintf(w, fileContents)
-	binary.Write(w, binary.LittleEndian, fileContents)
-} */
-
 func serveSHA(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	h := sha256.New()
 	now := time.Now()
 	delayReply()
+	addHeaders(w)
 	if verbose {
 		log.Println("[INFO]Serving SHA256 of " + strconv.FormatInt(now.UnixNano(), 10) + " to " + req.RemoteAddr)
 	}
-	w.Header().Set("Content-Type", *contentType)
 	if contentLength {
 		w.Header().Set("Content-Length", strconv.Itoa(len(strconv.FormatInt(now.UnixNano(), 10))))
 	}
@@ -152,10 +152,11 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	now := time.Now()
 	delayReply()
+	addHeaders(w)
 	if verbose {
 		log.Println("[INFO]Serving Time to " + req.RemoteAddr)
 	}
-	w.Header().Set("Content-Type", *contentType)
+	// why?
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 	//fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
 	if contentLength {
@@ -167,6 +168,7 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 func serveReturnCode(w http.ResponseWriter, req *http.Request) {
 	dumpRequest(req)
 	delayReply()
+	addHeaders(w)
 	if verbose {
 		log.Println("[INFO]Serving http code:", statusToReturn, "to", req.RemoteAddr)
 	}
@@ -185,7 +187,7 @@ func main() {
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
-	header = flag.String("header", "", "Header to add to reply")
+	headers = flag.String("headers", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
 	flag.IntVar(&statusToReturn, "HttpCode", 0, "http code to return. Nothing else returned")
