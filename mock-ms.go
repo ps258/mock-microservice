@@ -9,19 +9,21 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	"net/http/httputil"
 )
-	//"github.com/davecgh/go-spew/spew"
+
+//"github.com/davecgh/go-spew/spew"
 
 var (
 	fileName       *string
 	port           *string
-	delay          int
+	delay          time.Duration
+	delayStr       *string
 	contentType    *string
 	headers        *string
 	verbose        bool
@@ -73,12 +75,12 @@ func addHeaders(w http.ResponseWriter) {
 
 func delayReply() {
 	// just wait for a while
-	if delay > 0 {
+	if delay.Nanoseconds() > 0 {
 		if verbose {
-			log.Println("[INFO]Waiting", delay, "(ms)")
+			log.Println("[INFO]Waiting", delay)
 		}
 		//time.Sleep(time.Duration(delay) * time.Second)
-		time.Sleep(time.Duration(delay) * time.Millisecond)
+		time.Sleep(time.Duration(delay))
 		if verbose {
 			log.Println("[INFO]Waiting over")
 		}
@@ -223,7 +225,7 @@ func main() {
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.BoolVar(&uploadFile, "uploadFile", false, "Accept a file via POST and save it locally. Expects 'Name' in the form")
-	flag.IntVar(&delay, "delay", 0, "Delay in milliseconds before replying")
+	delayStr = flag.String("delay", "0s", "Duration to wait before replying")
 	headers = flag.String("headers", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
@@ -235,6 +237,8 @@ func main() {
 		fmt.Println("[FATAL]Either cert and key should both be given or neither")
 		os.Exit(1)
 	}
+
+	delay, err = time.ParseDuration(*delayStr)
 
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
@@ -251,7 +255,7 @@ func main() {
 	} else {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
-			os.Exit(1)
+		os.Exit(1)
 	}
 	printListenInfo(port)
 	if *cert != "" {
