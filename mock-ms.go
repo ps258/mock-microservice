@@ -75,9 +75,10 @@ func delayReply() {
 	// just wait for a while
 	if delay > 0 {
 		if verbose {
-			log.Println("[INFO]Waiting", delay, "(s)")
+			log.Println("[INFO]Waiting", delay, "(ms)")
 		}
-		time.Sleep(time.Duration(delay) * time.Second)
+		//time.Sleep(time.Duration(delay) * time.Second)
+		time.Sleep(time.Duration(delay) * time.Millisecond)
 		if verbose {
 			log.Println("[INFO]Waiting over")
 		}
@@ -192,7 +193,7 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 	if verbose {
 		log.Println("[INFO]Serving Time to " + req.RemoteAddr)
 	}
-	// why?
+	// why? (Something to do with CORS?)
 	w.Header().Set("X-XSS-Protection", "1; mode=block")
 	//fmt.Fprintf(w, time.Now().Format(time.RFC850) + "\n")
 	if contentLength {
@@ -222,7 +223,7 @@ func main() {
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.BoolVar(&uploadFile, "uploadFile", false, "Accept a file via POST and save it locally. Expects 'Name' in the form")
-	flag.IntVar(&delay, "delay", 0, "Delay in seconds before replying")
+	flag.IntVar(&delay, "delay", 0, "Delay in milliseconds before replying")
 	headers = flag.String("headers", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
