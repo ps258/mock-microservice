@@ -32,13 +32,35 @@ var (
 	returnTime     bool
 	returnSHA      bool
 	uploadFile     bool
+	printRPS       bool
 	cert           *string
 	key            *string
 	statusToReturn int
+	timestamp			 int64
+	callCount      int64
 )
 
 // 10MiB buffer
 const fileBuffer = 10485760
+
+func init() {
+	timestamp = time.Now().Unix()
+	callCount = 0
+}
+
+func rps() {
+	if printRPS {
+		timenow := time.Now().Unix()
+		timediff := timenow - timestamp
+		if timediff >= 60 {
+			log.Println("[INFO]RPS: ", callCount/timediff)
+			timestamp = timenow
+			callCount = 0
+		} else {
+			callCount++
+		}
+	}
+}
 
 func printListenInfo(port *string) {
 	var protocol string
@@ -136,6 +158,7 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 		//fmt.Println("bytes read: ", bytesread)
 		//fmt.Println("bytestream to string: ", string(buffer[:bytesread]))
 	}
+	rps()
 }
 
 func getUpload(w http.ResponseWriter, req *http.Request) {
@@ -169,6 +192,7 @@ func getUpload(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	fmt.Fprintf(w, "Upload successful")
+	rps()
 }
 
 func serveSHA(w http.ResponseWriter, req *http.Request) {
@@ -185,6 +209,7 @@ func serveSHA(w http.ResponseWriter, req *http.Request) {
 	}
 	h.Write([]byte(strconv.FormatInt(now.UnixNano(), 10)))
 	fmt.Fprintf(w, "%x", h.Sum(nil))
+	rps()
 }
 
 func serveTime(w http.ResponseWriter, req *http.Request) {
@@ -202,6 +227,7 @@ func serveTime(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(now.Format(time.StampMicro)+"\n")))
 	}
 	fmt.Fprintf(w, now.Format(time.StampMicro)+"\n")
+	rps()
 }
 
 func serveReturnCode(w http.ResponseWriter, req *http.Request) {
@@ -212,6 +238,7 @@ func serveReturnCode(w http.ResponseWriter, req *http.Request) {
 		log.Println("[INFO]Serving http code:", statusToReturn, "to", req.RemoteAddr)
 	}
 	http.Error(w, "", statusToReturn)
+	rps()
 }
 
 func main() {
@@ -225,6 +252,7 @@ func main() {
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.BoolVar(&uploadFile, "uploadFile", false, "Accept a file via POST and save it locally. Expects 'Name' in the form")
+	flag.BoolVar(&printRPS, "rps", false, "Print the RPS every minute (provided there is a request)")
 	delayStr = flag.String("delay", "0s", "Duration to wait before replying")
 	headers = flag.String("headers", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
