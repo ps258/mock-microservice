@@ -36,7 +36,7 @@ var (
 	cert           *string
 	key            *string
 	statusToReturn int
-	timestamp			 int64
+	timestamp      int64
 	callCount      int64
 )
 
@@ -267,6 +267,10 @@ func main() {
 	}
 
 	delay, err = time.ParseDuration(*delayStr)
+	if err != nil {
+		fmt.Println("[FATAL]", err)
+		os.Exit(1)
+	}
 
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
