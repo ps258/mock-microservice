@@ -169,15 +169,14 @@ func getUpload(w http.ResponseWriter, req *http.Request) {
 	}
 	delayReply()
 	addHeaders(w)
-	log.Println("form name; " + req.FormValue("Name"))
 	file, fileHeader, err := req.FormFile("Name")
-	if verbose {
-		log.Println("[INFO]Uploading " + fileHeader.Filename + " from " + req.RemoteAddr)
-		//log.Println("[INFO]Uploading " + "fred" + " from " + req.RemoteAddr)
-	}
 	if err != nil {
+		log.Println("form name is missing use 'curl -X POST -F Name=@filename'")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if verbose {
+		log.Println("[INFO]Uploading " + fileHeader.Filename + " from " + req.RemoteAddr)
 	}
 	defer file.Close()
 	dst, err := os.Create(filepath.Base(fileHeader.Filename))
