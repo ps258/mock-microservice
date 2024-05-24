@@ -172,15 +172,15 @@ func getUpload(w http.ResponseWriter, req *http.Request) {
 	log.Println("form name; " + req.FormValue("Name"))
 	file, fileHeader, err := req.FormFile("Name")
 	if verbose {
-		//log.Println("[INFO]Uploading " + fileHeader.Filename + " from " + req.RemoteAddr)
-		log.Println("[INFO]Uploading " + "fred" + " from " + req.RemoteAddr)
+		log.Println("[INFO]Uploading " + fileHeader.Filename + " from " + req.RemoteAddr)
+		//log.Println("[INFO]Uploading " + "fred" + " from " + req.RemoteAddr)
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
-	dst, err := os.Create(filepath.Ext(fileHeader.Filename))
+	dst, err := os.Create(filepath.Base(fileHeader.Filename))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
