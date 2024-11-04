@@ -154,7 +154,10 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 			}
 			break
 		}
-		binary.Write(w, binary.LittleEndian, buffer[:bytesread])
+		// Allow a delay in the middle of returning the contents of the file
+		//binary.Write(w, binary.LittleEndian, buffer[:bytesread])
+		//elay, err = time.ParseDuration("10s")
+		time.Sleep(time.Duration(delay))
 		//fmt.Println("bytes read: ", bytesread)
 		//fmt.Println("bytestream to string: ", string(buffer[:bytesread]))
 	}
