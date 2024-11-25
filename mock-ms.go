@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
+	//"encoding/binary"
 	"flag"
 	"fmt"
 	"io"
@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+  "github.com/gorilla/websocket"
 	"time"
 )
 
@@ -38,7 +39,13 @@ var (
 	statusToReturn int
 	timestamp      int64
 	callCount      int64
+  enableWebSocket bool
 )
+
+var upgrader = websocket.Upgrader{
+    ReadBufferSize:  1024,
+    WriteBufferSize: 1024,
+}
 
 // 10MiB buffer
 const fileBuffer = 10485760
@@ -144,9 +151,9 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 		os.Exit(1)
 	}
 	defer file.Close()
-	buffer := make([]byte, fileBuffer)
+	//buffer := make([]byte, fileBuffer)
 	for {
-		bytesread, err := file.Read(buffer)
+		//bytesread, err := file.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
 				fmt.Println("[FATAL]Error reading file "+*fileName+": ", err)
@@ -243,6 +250,62 @@ func serveReturnCode(w http.ResponseWriter, req *http.Request) {
 	rps()
 }
 
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+    conn, err := upgrader.Upgrade(w, r, nil)
+    if err != nil {
+        log.Println(err)
+        return
+    }
+    defer conn.Close()
+
+    for {
+        messageType, message, err := conn.ReadMessage()
+        if err != nil {
+            log.Println(err)
+            return
+        }
+        if verbose {
+            log.Printf("[INFO]Received WebSocket message: %s", message)
+        }
+        if string(message) == "exit" {
+          return
+        }
+        // send timestamps endlessly
+        // Echo the message back to the client
+        for {
+          now := time.Now()
+          //fmt.Fprintf(message, now.Format(time.StampMicro)+"\n")
+          err = conn.WriteMessage(messageType, []byte(now.Format(time.StampMicro)))
+          if err != nil {
+              log.Println(err)
+              return
+          }
+        }
+    }
+
+    /*
+    for {
+        messageType, message, err := conn.ReadMessage()
+        if err != nil {
+            log.Println(err)
+            return
+        }
+        if verbose {
+            log.Printf("[INFO]Received WebSocket message: %s", message)
+        }
+        if string(message) == "exit" {
+          return
+        }
+        // Echo the message back to the client
+        err = conn.WriteMessage(messageType, message)
+        if err != nil {
+            log.Println(err)
+            return
+        }
+    } */
+
+}
+
 func main() {
 	var err error
 	port = flag.String("port", "8080", "The port to listen on")
@@ -255,6 +318,7 @@ func main() {
 	flag.BoolVar(&returnSHA, "SHA", false, "Return a sha256 of the time")
 	flag.BoolVar(&uploadFile, "uploadFile", false, "Accept a file via POST and save it locally. Expects 'Name' in the form")
 	flag.BoolVar(&printRPS, "rps", false, "Print the RPS every minute (provided there is a request)")
+  flag.BoolVar(&enableWebSocket, "websocket", false, "Enable WebSocket support")
 	delayStr = flag.String("delay", "0s", "Duration to wait before replying")
 	headers = flag.String("headers", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
@@ -274,30 +338,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
-	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
-	if returnTime {
-		http.HandleFunc("/", serveTime)
-	} else if returnSHA {
-		http.HandleFunc("/", serveSHA)
-	} else if statusToReturn != 0 {
-		http.HandleFunc("/", serveReturnCode)
-	} else if uploadFile {
-		http.HandleFunc("/", getUpload)
-	} else if *fileName != "" {
-		http.HandleFunc("/", serveFile)
-	} else {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-	printListenInfo(port)
-	if *cert != "" {
-		err = http.ListenAndServeTLS(":"+*port, *cert, *key, nil)
-	} else {
-		err = http.ListenAndServe(":"+*port, nil)
-	}
-	if err != nil {
-		fmt.Println("[FATAL]Unable to serve on port "+*port, err)
-	}
+  http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
+  http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
+  if enableWebSocket {
+    http.HandleFunc("/ws", handleWebSocket)
+  } else if returnTime {
+    http.HandleFunc("/", serveTime)
+  } else if returnSHA {
+    http.HandleFunc("/", serveSHA)
+  } else if statusToReturn != 0 {
+    http.HandleFunc("/", serveReturnCode)
+  } else if uploadFile {
+    http.HandleFunc("/", getUpload)
+  } else if *fileName != "" {
+    http.HandleFunc("/", serveFile)
+  } else {
+    fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+    flag.PrintDefaults()
+    os.Exit(1)
+  }
+  printListenInfo(port)
+  if *cert != "" {
+    err = http.ListenAndServeTLS(":"+*port, *cert, *key, nil)
+  } else {
+    err = http.ListenAndServe(":"+*port, nil)
+  }
+  if err != nil {
+    fmt.Println("[FATAL]Unable to serve on port "+*port, err)
+  }
 }
