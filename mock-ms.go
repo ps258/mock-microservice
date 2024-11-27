@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
-	//"encoding/binary"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"io"
@@ -151,9 +151,9 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 		os.Exit(1)
 	}
 	defer file.Close()
-	//buffer := make([]byte, fileBuffer)
+	buffer := make([]byte, fileBuffer)
 	for {
-		//bytesread, err := file.Read(buffer)
+		bytesread, err := file.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
 				fmt.Println("[FATAL]Error reading file "+*fileName+": ", err)
@@ -161,12 +161,18 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
 			}
 			break
 		}
-		// Allow a delay in the middle of returning the contents of the file
-		//binary.Write(w, binary.LittleEndian, buffer[:bytesread])
-		//elay, err = time.ParseDuration("10s")
-		time.Sleep(time.Duration(delay))
-		//fmt.Println("bytes read: ", bytesread)
-		//fmt.Println("bytestream to string: ", string(buffer[:bytesread]))
+		if false {
+			// Allow a delay in the middle of returning the contents of the file
+			binary.Write(w, binary.LittleEndian, buffer[:bytesread])
+			// reuse the delay variable that causes an initial delay in replying.
+			delay, err = time.ParseDuration("10s")
+			time.Sleep(time.Duration(delay))
+			fmt.Println("bytes read: ", bytesread)
+			fmt.Println("bytestream to string: ", string(buffer[:bytesread]))
+		} else {
+			// No delay in writing 'buffer' sized chunks
+			binary.Write(w, binary.LittleEndian, buffer[:bytesread])
+		}
 	}
 	rps()
 }
@@ -258,51 +264,51 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
     }
     defer conn.Close()
 
-    for {
-        messageType, message, err := conn.ReadMessage()
-        if err != nil {
-            log.Println(err)
-            return
-        }
-        if verbose {
-            log.Printf("[INFO]Received WebSocket message: %s", message)
-        }
-        if string(message) == "exit" {
-          return
-        }
-        // send timestamps endlessly
-        // Echo the message back to the client
-        for {
-          now := time.Now()
-          //fmt.Fprintf(message, now.Format(time.StampMicro)+"\n")
-          err = conn.WriteMessage(messageType, []byte(now.Format(time.StampMicro)))
-          if err != nil {
-              log.Println(err)
-              return
-          }
-        }
-    }
-
-    /*
-    for {
-        messageType, message, err := conn.ReadMessage()
-        if err != nil {
-            log.Println(err)
-            return
-        }
-        if verbose {
-            log.Printf("[INFO]Received WebSocket message: %s", message)
-        }
-        if string(message) == "exit" {
-          return
-        }
-        // Echo the message back to the client
-        err = conn.WriteMessage(messageType, message)
-        if err != nil {
-            log.Println(err)
-            return
-        }
-    } */
+		if true {
+			for {
+					messageType, message, err := conn.ReadMessage()
+					if err != nil {
+							log.Println(err)
+							return
+					}
+					if verbose {
+							log.Printf("[INFO]Received WebSocket message: %s", message)
+					}
+					if string(message) == "exit" {
+						return
+					}
+					// send timestamps endlessly
+					// Echo the message back to the client
+					for {
+						now := time.Now()
+						err = conn.WriteMessage(messageType, []byte(now.Format(time.StampMicro)))
+						if err != nil {
+								log.Println(err)
+								return
+						}
+					}
+			}
+		} else {
+			for {
+				messageType, message, err := conn.ReadMessage()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				if verbose {
+					log.Printf("[INFO]Received WebSocket message: %s", message)
+				}
+				if string(message) == "exit" {
+					return
+				}
+				// Echo the message back to the client
+				err = conn.WriteMessage(messageType, message)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+			} 
+		}
 
 }
 
