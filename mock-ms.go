@@ -40,6 +40,7 @@ var (
 	timestamp      int64
 	callCount      int64
   enableWebSocket bool
+  floodWebsocket bool
 )
 
 var upgrader = websocket.Upgrader{
@@ -69,22 +70,16 @@ func rps() {
 	}
 }
 
-func printListenInfo(port *string) {
-	var protocol string
+func printListenInfo(port *string, protocol *string) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Fatal("Oops: " + err.Error())
-	}
-	if *cert == "" {
-		protocol = "http"
-	} else {
-		protocol = "https"
 	}
 	for _, a := range addrs {
 		//if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 		if ipnet, ok := a.(*net.IPNet); ok {
 			if ipnet.IP.To4() != nil {
-				fmt.Println("Listening on " + protocol + "://" + ipnet.IP.String() + ":" + *port)
+				fmt.Println("Listening on " + *protocol + "://" + ipnet.IP.String() + ":" + *port)
 			}
 		}
 	}
@@ -264,7 +259,8 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
     }
     defer conn.Close()
 
-		if true {
+		if floodWebsocket {
+			// send timestamps endlessly
 			for {
 					messageType, message, err := conn.ReadMessage()
 					if err != nil {
@@ -278,7 +274,6 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 					// send timestamps endlessly
-					// Echo the message back to the client
 					for {
 						now := time.Now()
 						err = conn.WriteMessage(messageType, []byte(now.Format(time.StampMicro)))
@@ -289,6 +284,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 					}
 			}
 		} else {
+			// echo the request back to the caller
 			for {
 				messageType, message, err := conn.ReadMessage()
 				if err != nil {
@@ -307,13 +303,14 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 					log.Println(err)
 					return
 				}
-			} 
+			}
 		}
 
 }
 
 func main() {
 	var err error
+	var protocol string
 	port = flag.String("port", "8080", "The port to listen on")
 	fileName = flag.String("file", "", "File to serve")
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
@@ -325,6 +322,7 @@ func main() {
 	flag.BoolVar(&uploadFile, "uploadFile", false, "Accept a file via POST and save it locally. Expects 'Name' in the form")
 	flag.BoolVar(&printRPS, "rps", false, "Print the RPS every minute (provided there is a request)")
   flag.BoolVar(&enableWebSocket, "websocket", false, "Enable WebSocket support")
+  flag.BoolVar(&floodWebsocket, "wsflood", false, "Flood timesamps into the websocket once a request is sent")
 	delayStr = flag.String("delay", "0s", "Duration to wait before replying")
 	headers = flag.String("headers", "", "Header to add to reply")
 	cert = flag.String("cert", "", "PEM encoded certificate to use for https")
@@ -347,7 +345,7 @@ func main() {
   http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
   http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
   if enableWebSocket {
-    http.HandleFunc("/ws", handleWebSocket)
+    http.HandleFunc("/", handleWebSocket)
   } else if returnTime {
     http.HandleFunc("/", serveTime)
   } else if returnSHA {
@@ -363,10 +361,19 @@ func main() {
     flag.PrintDefaults()
     os.Exit(1)
   }
-  printListenInfo(port)
   if *cert != "" {
+		protocol = "https"
+		if enableWebSocket {
+			protocol = "wss"
+		}
+		printListenInfo(port, &protocol)
     err = http.ListenAndServeTLS(":"+*port, *cert, *key, nil)
   } else {
+		protocol = "http"
+		if enableWebSocket {
+			protocol = "ws"
+		}
+		printListenInfo(port, &protocol)
     err = http.ListenAndServe(":"+*port, nil)
   }
   if err != nil {
