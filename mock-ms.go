@@ -34,6 +34,7 @@ var (
 	returnSHA      bool
 	uploadFile     bool
 	printRPS       bool
+	nokeepalive    bool
 	cert           *string
 	key            *string
 	statusToReturn int
@@ -315,6 +316,7 @@ func main() {
 	fileName = flag.String("file", "", "File to serve")
 	contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&nokeepalive, "nokeepalive", false, "Disable client Keep-alives")
 	flag.BoolVar(&dumpReq, "dumpReq", false, "Dump the request")
 	flag.BoolVar(&contentLength, "contentLength", false, "Populate the Content-Length header in the reply")
 	flag.BoolVar(&returnTime, "time", false, "Return the timestamp rather than the contents of a file")
@@ -351,21 +353,32 @@ func main() {
   http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
   if enableWebSocket {
     http.HandleFunc("/", handleWebSocket)
-  } else if returnTime {
-    http.HandleFunc("/", serveTime)
-  } else if returnSHA {
-    http.HandleFunc("/", serveSHA)
-  } else if statusToReturn != 0 {
-    http.HandleFunc("/", serveReturnCode)
-  } else if uploadFile {
-    http.HandleFunc("/", getUpload)
-  } else if *fileName != "" {
-    http.HandleFunc("/", serveFile)
-  } else {
-    fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-    flag.PrintDefaults()
-    os.Exit(1)
-  }
+	} else {
+		if nokeepalive {
+			fmt.Println("Keep-alives disabled")
+			http.DefaultTransport.(*http.Transport).DisableKeepAlives = true
+		} else {
+			if verbose {
+				fmt.Println("Keepalives enabled (default)")
+			}
+			http.DefaultTransport.(*http.Transport).DisableKeepAlives = false
+		}
+		if returnTime {
+			http.HandleFunc("/", serveTime)
+		} else if returnSHA {
+			http.HandleFunc("/", serveSHA)
+		} else if statusToReturn != 0 {
+			http.HandleFunc("/", serveReturnCode)
+		} else if uploadFile {
+			http.HandleFunc("/", getUpload)
+		} else if *fileName != "" {
+			http.HandleFunc("/", serveFile)
+		} else {
+			fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+			flag.PrintDefaults()
+			os.Exit(1)
+		}
+	}
   if *cert != "" {
 		protocol = "https"
 		if enableWebSocket {
