@@ -342,6 +342,11 @@ func main() {
 		os.Exit(1)
 	}
 
+  // if floodWebsocket is true it implies that enableWebSocket must be too
+	if floodWebsocket {
+		enableWebSocket = true
+	}
+
   http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
   http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
   if enableWebSocket {
