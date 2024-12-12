@@ -252,60 +252,60 @@ func serveReturnCode(w http.ResponseWriter, req *http.Request) {
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-    conn, err := upgrader.Upgrade(w, r, nil)
-    if err != nil {
+  upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+  conn, err := upgrader.Upgrade(w, r, nil)
+  if err != nil {
+    log.Println(err)
+    return
+  }
+  defer conn.Close()
+
+  if floodWebsocket {
+    // send timestamps endlessly
+    for {
+      messageType, message, err := conn.ReadMessage()
+      if err != nil {
         log.Println(err)
         return
+      }
+      if verbose {
+        log.Printf("[INFO]Received WebSocket message: %s", message)
+      }
+      if string(message) == "exit" {
+        return
+      }
+      // send timestamps endlessly
+      for {
+        now := time.Now()
+        err = conn.WriteMessage(messageType, []byte(now.Format(time.StampMicro)))
+        if err != nil {
+          log.Println(err)
+          return
+        }
+      }
     }
-    defer conn.Close()
-
-		if floodWebsocket {
-			// send timestamps endlessly
-			for {
-					messageType, message, err := conn.ReadMessage()
-					if err != nil {
-							log.Println(err)
-							return
-					}
-					if verbose {
-							log.Printf("[INFO]Received WebSocket message: %s", message)
-					}
-					if string(message) == "exit" {
-						return
-					}
-					// send timestamps endlessly
-					for {
-						now := time.Now()
-						err = conn.WriteMessage(messageType, []byte(now.Format(time.StampMicro)))
-						if err != nil {
-								log.Println(err)
-								return
-						}
-					}
-			}
-		} else {
-			// echo the request back to the caller
-			for {
-				messageType, message, err := conn.ReadMessage()
-				if err != nil {
-					log.Println(err)
-					return
-				}
-				if verbose {
-					log.Printf("[INFO]Received WebSocket message: %s", message)
-				}
-				if string(message) == "exit" {
-					return
-				}
-				// Echo the message back to the client
-				err = conn.WriteMessage(messageType, message)
-				if err != nil {
-					log.Println(err)
-					return
-				}
-			}
-		}
-
+  } else {
+    // echo the request back to the caller
+    for {
+      messageType, message, err := conn.ReadMessage()
+      if err != nil {
+        log.Println(err)
+        return
+      }
+      if verbose {
+        log.Printf("[INFO]Received WebSocket message: %s", message)
+      }
+      if string(message) == "exit" {
+        return
+      }
+      // Echo the message back to the client
+      err = conn.WriteMessage(messageType, message)
+      if err != nil {
+        log.Println(err)
+        return
+      }
+    }
+  }
 }
 
 func main() {
