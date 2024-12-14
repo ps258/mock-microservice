@@ -81,7 +81,7 @@ func printListenInfo(port *string, protocol *string) {
         //if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
         if ipnet, ok := a.(*net.IPNet); ok {
             if ipnet.IP.To4() != nil {
-                fmt.Println("Listening on " + *protocol + "://" + ipnet.IP.String() + ":" + *port)
+                log.Println("Listening on " + *protocol + "://" + ipnet.IP.String() + ":" + *port)
             }
         }
     }
@@ -155,7 +155,7 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
         bytesread, err := file.Read(buffer)
         if err != nil {
             if err != io.EOF {
-                fmt.Println("[FATAL]Error reading file "+*fileName+": ", err)
+                log.Println("[FATAL]Error reading file "+*fileName+": ", err)
                 os.Exit(1)
             }
             break
@@ -166,8 +166,8 @@ func serveFile(w http.ResponseWriter, req *http.Request) {
             // reuse the delay variable that causes an initial delay in replying.
             delay, err = time.ParseDuration("10s")
             time.Sleep(time.Duration(delay))
-            fmt.Println("bytes read: ", bytesread)
-            fmt.Println("bytestream to string: ", string(buffer[:bytesread]))
+            log.Println("bytes read: ", bytesread)
+            log.Println("bytestream to string: ", string(buffer[:bytesread]))
         } else {
             // No delay in writing 'buffer' sized chunks
             binary.Write(w, binary.LittleEndian, buffer[:bytesread])
@@ -337,13 +337,13 @@ func main() {
     flag.Parse()
 
     if (*cert != "" && *key == "") || (*cert == "" && *key != "") {
-        fmt.Println("[FATAL]Either cert and key should both be given or neither")
+        log.Println("[FATAL]Either cert and key should both be given or neither")
         os.Exit(1)
     }
 
     delay, err = time.ParseDuration(*delayStr)
     if err != nil {
-        fmt.Println("[FATAL]", err)
+        log.Println("[FATAL]", err)
         os.Exit(1)
     }
 
@@ -358,11 +358,11 @@ func main() {
         http.HandleFunc("/", handleWebSocket)
     } else {
         if nokeepalive {
-            fmt.Println("Keep-alives disabled")
+            log.Println("Keep-alives disabled")
             http.DefaultTransport.(*http.Transport).DisableKeepAlives = true
         } else {
             if verbose {
-                fmt.Println("Keepalives enabled (default)")
+                log.Println("Keepalives enabled (default)")
             }
             http.DefaultTransport.(*http.Transport).DisableKeepAlives = false
         }
@@ -398,6 +398,6 @@ func main() {
         err = http.ListenAndServe(":"+*port, nil)
     }
     if err != nil {
-        fmt.Println("[FATAL]Unable to serve on port "+*port, err)
+        log.Println("[FATAL]Unable to serve on port "+*port, err)
     }
 }
