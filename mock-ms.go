@@ -2,6 +2,7 @@ package main
 
 import (
     "crypto/sha256"
+    "crypto/tls"
     "encoding/binary"
     "flag"
     "fmt"
@@ -184,6 +185,9 @@ func getUpload(w http.ResponseWriter, req *http.Request) {
     }
     delayReply()
     addHeaders(w)
+    // This will create a temp file called /tmp/multipart-xxx and save the uploaded file into that
+    // Later this file will be copied to the target file name
+    // I haven't been able to work out how to save it directly into the right file
     file, fileHeader, err := req.FormFile("Name")
     if err != nil {
         log.Println("[FATAL]Form name is missing use 'curl -X POST -F Name=@filename'")
@@ -315,6 +319,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 func main() {
     var err error
     var protocol string
+    var  TLSVersion uint16
     port = flag.String("port", "8080", "The port to listen on")
     fileName = flag.String("file", "", "File to serve")
     contentType = flag.String("contentType", "text/plain", "The content type to put into the Content-Type header")
@@ -384,11 +389,26 @@ func main() {
     }
     if *cert != "" {
         protocol = "https"
+        /* Possible TLS versions (should make this a runtime option)
+          tls.VersionSSL30: "SSL",
+          tls.VersionTLS10: "TLS 1.0",
+          tls.VersionTLS11: "TLS 1.1",
+          tls.VersionTLS12: "TLS 1.2",
+          tls.VersionTLS13: "TLS 1.3",
+        */
+        TLSVersion = tls.VersionTLS10
         if enableWebSocket {
             protocol = "wss"
         }
         printListenInfo(port, &protocol)
-        err = http.ListenAndServeTLS(":"+*port, *cert, *key, nil)
+        server := &http.Server{
+          Addr: ":" + *port,
+          TLSConfig: &tls.Config{
+            MinVersion: TLSVersion,
+          },
+        }
+        err = server.ListenAndServeTLS(*cert, *key)
+        //err = http.ListenAndServeTLS(":"+*port, *cert, *key, nil)
     } else {
         protocol = "http"
         if enableWebSocket {
