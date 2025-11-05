@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
@@ -18,6 +19,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 //"github.com/davecgh/go-spew/spew"
@@ -45,6 +53,8 @@ var (
 	enableWebSocket bool
 	floodWebsocket  bool
 	keepCase        bool
+	otelEndpoint    *string
+	serviceName     *string
 )
 
 var upgrader = websocket.Upgrader{
@@ -58,6 +68,46 @@ const fileBuffer = 10485760
 func init() {
 	timestamp = time.Now().Unix()
 	callCount = 0
+}
+
+// initTracer initializes OpenTelemetry tracer
+func initTracer(ctx context.Context, endpoint, serviceName string) (*trace.TracerProvider, error) {
+	if endpoint == "" {
+		// If no endpoint is provided, return a no-op tracer provider
+		return trace.NewTracerProvider(), nil
+	}
+
+	// Create OTLP exporter
+	exporter, err := otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(), // Use insecure connection for simplicity
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
+	}
+
+	// Create resource with service name
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String(serviceName),
+			semconv.ServiceVersionKey.String("1.0.0"),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	// Create tracer provider
+	tp := trace.NewTracerProvider(
+		trace.WithBatcher(exporter),
+		trace.WithResource(res),
+	)
+
+	// Set global tracer provider
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	return tp, nil
 }
 
 func rps() {
@@ -359,7 +409,25 @@ func main() {
 	key = flag.String("key", "", "PEM encoded key to use with certificate for https")
 	flag.IntVar(&statusToReturn, "HttpCode", 0, "http code to return. Nothing else returned")
 
+	// OpenTelemetry flags
+	otelEndpoint = flag.String("otel-endpoint", "", "OpenTelemetry collector gRPC endpoint")
+	serviceName = flag.String("service-name", "mock-ms", "Service name for OpenTelemetry tracing")
+
 	flag.Parse()
+
+	// Initialize OpenTelemetry tracing
+	ctx := context.Background()
+	tp, err := initTracer(ctx, *otelEndpoint, *serviceName)
+	if err != nil {
+		log.Printf("[WARN]Failed to initialize OpenTelemetry tracer: %v", err)
+	} else if *otelEndpoint != "" {
+		defer func() {
+			if err := tp.Shutdown(ctx); err != nil {
+				log.Printf("[WARN]Error shutting down tracer provider: %v", err)
+			}
+		}()
+		log.Printf("[INFO]OpenTelemetry tracing initialized with endpoint: %s, service: %s", *otelEndpoint, *serviceName)
+	}
 
 	if (*cert != "" && *key == "") || (*cert == "" && *key != "") {
 		log.Println("[FATAL]Either cert and key should both be given or neither")
@@ -380,6 +448,7 @@ func main() {
 	http.DefaultTransport.(*http.Transport).MaxIdleConnsPerHost = 100
 	http.DefaultTransport.(*http.Transport).MaxIdleConns = 100
 	if enableWebSocket {
+		// WebSocket handlers don't use otelhttp middleware as it's not compatible
 		http.HandleFunc("/", handleWebSocket)
 	} else {
 		if nokeepalive {
@@ -391,21 +460,31 @@ func main() {
 			}
 			http.DefaultTransport.(*http.Transport).DisableKeepAlives = false
 		}
+
+		// Wrap handlers with OpenTelemetry instrumentation
+		var handler http.Handler
 		if returnTime {
-			http.HandleFunc("/", serveTime)
+			handler = http.HandlerFunc(serveTime)
 		} else if returnSHA {
-			http.HandleFunc("/", serveSHA)
+			handler = http.HandlerFunc(serveSHA)
 		} else if statusToReturn != 0 {
-			http.HandleFunc("/", serveReturnCode)
+			handler = http.HandlerFunc(serveReturnCode)
 		} else if uploadFile {
-			http.HandleFunc("/", getUpload)
+			handler = http.HandlerFunc(getUpload)
 		} else if *fileName != "" {
-			http.HandleFunc("/", serveFile)
+			handler = http.HandlerFunc(serveFile)
 		} else {
 			fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 			flag.PrintDefaults()
 			os.Exit(1)
 		}
+
+		// Apply OpenTelemetry HTTP instrumentation if endpoint is configured
+		if *otelEndpoint != "" {
+			handler = otelhttp.NewHandler(handler, "mock-ms-handler")
+		}
+
+		http.Handle("/", handler)
 	}
 	if *cert != "" {
 		protocol = "https"
