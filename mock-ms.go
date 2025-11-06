@@ -22,6 +22,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -55,6 +56,8 @@ var (
 	keepCase        bool
 	otelEndpoint    *string
 	serviceName     *string
+	otelProtocol    *string
+	otelHeaders     *string
 )
 
 var upgrader = websocket.Upgrader{
@@ -71,19 +74,63 @@ func init() {
 }
 
 // initTracer initializes OpenTelemetry tracer
-func initTracer(ctx context.Context, endpoint, serviceName string) (*trace.TracerProvider, error) {
+func initTracer(ctx context.Context, endpoint, serviceName, protocol, headersStr string) (*trace.TracerProvider, error) {
 	if endpoint == "" {
 		// If no endpoint is provided, return a no-op tracer provider
 		return trace.NewTracerProvider(), nil
 	}
 
-	// Create OTLP exporter
-	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(endpoint),
-		otlptracegrpc.WithInsecure(), // Use insecure connection for simplicity
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OTLP exporter: %w", err)
+	var exporter trace.SpanExporter
+	var err error
+
+	// Create OTLP exporter based on protocol
+	switch protocol {
+	case "http", "https":
+		// Parse headers if provided
+		httpOptions := []otlptracehttp.Option{
+			otlptracehttp.WithEndpoint(endpoint),
+		}
+
+		// Only use insecure connection for http protocol
+		if protocol == "http" {
+			httpOptions = append(httpOptions, otlptracehttp.WithInsecure())
+		}
+
+		if headersStr != "" {
+			headers := make(map[string]string)
+			for _, header := range strings.Split(headersStr, ",") {
+				// Support both : and = as delimiters for key-value pairs
+				var parts []string
+				if strings.Contains(header, "=") {
+					parts = strings.SplitN(strings.TrimSpace(header), "=", 2)
+				} else {
+					parts = strings.SplitN(strings.TrimSpace(header), ":", 2)
+				}
+				if len(parts) == 2 {
+					key := strings.TrimSpace(parts[0])
+					value := strings.TrimSpace(parts[1])
+					headers[key] = value
+				}
+			}
+			if len(headers) > 0 {
+				httpOptions = append(httpOptions, otlptracehttp.WithHeaders(headers))
+			}
+		}
+
+		exporter, err = otlptracehttp.New(ctx, httpOptions...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OTLP HTTP exporter: %w", err)
+		}
+	case "grpc":
+		exporter, err = otlptracegrpc.New(ctx,
+			otlptracegrpc.WithEndpoint(endpoint),
+			otlptracegrpc.WithInsecure(), // Use insecure connection for simplicity
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OTLP gRPC exporter: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported OTLP protocol: %s (supported: grpc, http, https)", protocol)
 	}
 
 	// Create resource with service name
@@ -410,14 +457,16 @@ func main() {
 	flag.IntVar(&statusToReturn, "HttpCode", 0, "http code to return. Nothing else returned")
 
 	// OpenTelemetry flags
-	otelEndpoint = flag.String("otel-endpoint", "", "OpenTelemetry collector gRPC endpoint")
+	otelEndpoint = flag.String("otel-endpoint", "", "OpenTelemetry collector endpoint (without protocol prefix)")
 	serviceName = flag.String("service-name", "mock-ms", "Service name for OpenTelemetry tracing")
+	otelProtocol = flag.String("otel-protocol", "grpc", "OpenTelemetry protocol (grpc, http, or https)")
+	otelHeaders = flag.String("otel-headers", "", "Headers to send to HTTP OTEL collector (format: 'Key1:Value1,Key2:Value2')")
 
 	flag.Parse()
 
 	// Initialize OpenTelemetry tracing
 	ctx := context.Background()
-	tp, err := initTracer(ctx, *otelEndpoint, *serviceName)
+	tp, err := initTracer(ctx, *otelEndpoint, *serviceName, *otelProtocol, *otelHeaders)
 	if err != nil {
 		log.Printf("[WARN]Failed to initialize OpenTelemetry tracer: %v", err)
 	} else if *otelEndpoint != "" {
@@ -426,7 +475,11 @@ func main() {
 				log.Printf("[WARN]Error shutting down tracer provider: %v", err)
 			}
 		}()
-		log.Printf("[INFO]OpenTelemetry tracing initialized with endpoint: %s, service: %s", *otelEndpoint, *serviceName)
+		if *otelHeaders != "" {
+			log.Printf("[INFO]OpenTelemetry tracing initialized with protocol: %s, endpoint: %s, service: %s, headers: %s", *otelProtocol, *otelEndpoint, *serviceName, *otelHeaders)
+		} else {
+			log.Printf("[INFO]OpenTelemetry tracing initialized with protocol: %s, endpoint: %s, service: %s", *otelProtocol, *otelEndpoint, *serviceName)
+		}
 	}
 
 	if (*cert != "" && *key == "") || (*cert == "" && *key != "") {
